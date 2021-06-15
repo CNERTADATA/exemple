@@ -1,8 +1,9 @@
-import { Component } from '@angular/core';
+import {ChangeDetectionStrategy, Component} from '@angular/core';
 
 @Component({
   selector: 'asd-root',
-  template: ``,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<asd-page></asd-page>`,
   styles: []
 })
 export class AppComponent {
