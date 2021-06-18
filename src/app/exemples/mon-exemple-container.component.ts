@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Routes } from '@angular/router';
 import { ObjetMetierRepository } from './state/objet-metier-repository.service';
-import { Observable } from 'rxjs';
-import { map, switchMap } from 'rxjs/operators';
+import { Observable, of } from 'rxjs';
+import { catchError, map, shareReplay, switchMap } from 'rxjs/operators';
 import { VisualisationComplete } from './state/visualisation-complete.model';
 import { MatListModule } from '@angular/material/list';
 import { MonExemplePageModule } from './mon-exemple-page.component';
@@ -27,6 +27,9 @@ import { PlanApi } from './state/objet-metier-api.model';
         <mat-spinner [diameter]="25"></mat-spinner>
       </div>
     </ng-template>
+    <div class="center" *ngIf="(visualisationComplete$ | async)?.error">
+      {{ (visualisationComplete$ | async)?.error }}
+    </div>
   `,
   styles: [
     `
@@ -46,7 +49,7 @@ export class MonExempleContainerComponent {
     // On sépare la logique avec la création de méthode afin d'avoir un code plus simple a lire et la possibilité de le réutiliser si besoin
 
     // Il faut voir l'enchainement des switchMap comme un remplacement de la donnée dans le stream.
-    // On part avec la récupération du plan => switchMap + map =>
+    // On part avec la récupération du plan => switchMap + map = on a maintenant dans le deuxieme switchMap un objet contenant le plan et les ids des fiches utilisées.
     this.visualisationComplete$ = this._objetMetierRepository
       .getPlan('23')
       .pipe(
@@ -58,8 +61,12 @@ export class MonExempleContainerComponent {
         // Ici le destruring nous permet d'avoir un niveau d'abstraction en moins et ainsi d'avoir un peu plus de clarté
         map(({ plan, fiches }) => ({
           libellePlan: plan.libelleLong,
-          libelleFiches: fiches.map((fiche) => fiche.libelleLong),
-        }))
+          libelleFiches: fiches?.map((fiche) => fiche.libelleLong),
+        })),
+        catchError(() =>
+          of({ error: 'Une erreur est survenue lors du chargement du plan' })
+        ),
+        shareReplay({ bufferSize: 1, refCount: true })
       );
   }
 
@@ -68,9 +75,17 @@ export class MonExempleContainerComponent {
    * @param plan récupéré de l'appel précédent avec un type lié au retour de l'API
    */
   getUsedFicheIds(plan: PlanApi) {
-    return this._objetMetierRepository
-      .getUsedFicheIds(plan.id)
-      .pipe(map((usedFicheIds) => ({ plan, usedFicheIds })));
+    return this._objetMetierRepository.getUsedFicheIds(plan.id).pipe(
+      map((usedFicheIds) => ({ plan, usedFicheIds })),
+      catchError(() =>
+        of({
+          plan,
+          usedFicheIds: null,
+          error:
+            'Une erreur est survenue lors du chargement des fiches utilisées',
+        })
+      )
+    );
   }
 
   /**
@@ -78,14 +93,22 @@ export class MonExempleContainerComponent {
    * @param plan récupéré du map précédent avec un type lié au retour de l'API
    * @param usedFicheIds récupéré de l'appel précédent avec un type lié au retour de l'API
    */
-  getFiches(plan: PlanApi, usedFicheIds: number[]) {
+  getFiches(plan: PlanApi, usedFicheIds: number[] | null) {
     return this._objetMetierRepository.getFiches().pipe(
       map((fiches) => ({
         plan,
-        fiches: fiches.filter((fiche) =>
-          usedFicheIds.includes(fiche.epreuveReglementaireRefeaId)
+        fiches: fiches?.filter((fiche) =>
+          usedFicheIds?.includes(fiche.epreuveReglementaireRefeaId)
         ),
-      }))
+      })),
+      catchError(() =>
+        of({
+          plan,
+          fiches: null,
+          error:
+            'Une erreur est survenu lors du chargement des fiches liés au plan',
+        })
+      )
     );
   }
 }

@@ -13,12 +13,15 @@ import { VisualisationComplete } from './state/visualisation-complete.model';
   selector: 'asd-mon-exemple-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-<!--    On affiche libelle du plan et de toutes les fiches le composant-->
+    <!--    On affiche libelle du plan et de toutes les fiches le composant-->
     <mat-list>
       <strong>{{ visualisationComplete?.libellePlan }}</strong>
       <mat-list-item
         *ngFor="let libelleFiche of visualisationComplete?.libelleFiches"
         >{{ libelleFiche }}</mat-list-item
+      >
+      <mat-list-item *ngIf="visualisationComplete?.libelleFiches?.length === 0"
+        >Aucune fiche n'est associé à ce plan.</mat-list-item
       >
     </mat-list>
   `,
